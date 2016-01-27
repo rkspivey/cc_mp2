@@ -54,14 +54,14 @@ public class CassieAirportCarriers extends Configured implements Tool {
 
         jobA.setMapperClass(AirportCountMap.class);
         jobA.setReducerClass(AirportCountReduce.class);
-        jobA.setCombinerClass(AirportCountCombiner.class);
+        //jobA.setCombinerClass(AirportCountCombiner.class);
 
         FileInputFormat.setInputPaths(jobA, new Path(args[0]));
         
-        String query = "UPDATE mp2.airport_carrier_ontime_departs SET "
-        		+ "ontime_departs = ?, origin_name = ?, airline_name = ?";
+        String query = "UPDATE mp2.airport_carrier_ontime SET "
+        		+ "origin_name = ?, airline_name = ?";
         CqlConfigHelper.setOutputCql(jobA.getConfiguration(), query);
-        ConfigHelper.setOutputColumnFamily(jobA.getConfiguration(), "mp2", "airport_carrier_ontime_departs");
+        ConfigHelper.setOutputColumnFamily(jobA.getConfiguration(), "mp2", "airport_carrier_ontime");
         ConfigHelper.setOutputInitialAddress(jobA.getConfiguration(), args[1]);
         ConfigHelper.setOutputPartitioner(jobA.getConfiguration(), "Murmur3Partitioner");
         jobA.setOutputFormatClass(CqlOutputFormat.class);
@@ -82,6 +82,8 @@ public class CassieAirportCarriers extends Configured implements Tool {
         			Double delayMinutes = Double.parseDouble(values[Util.DEP_DELAY_15_INDEX]);
         			if (delayMinutes <= 0) {
         				context.write(new Text(airportAirlineKey), new IntWritable(1));
+        			} else {
+        				context.write(new Text(airportAirlineKey), new IntWritable(0));
         			}
         		} catch (NumberFormatException nfe) {
         			// just ignore
@@ -116,19 +118,21 @@ public class CassieAirportCarriers extends Configured implements Tool {
     	
         @Override
         public void reduce(Text key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
-        	int count = 0;
+        	double onTimeCount = 0;
+        	double totalCount = 0;
         	
         	for (IntWritable value : values) {
-       			count += value.get();
+       			onTimeCount += value.get();
+       			totalCount++;
         	}
         	
         	Map<String, ByteBuffer> keys = new LinkedHashMap<String, ByteBuffer>();
         	String[] keyValues = key.toString().split(" ");
         	keys.put("origin", ByteBufferUtil.bytes(keyValues[0]));
         	keys.put("airline_id", ByteBufferUtil.bytes(keyValues[1]));
+        	keys.put("ontime_percentage", ByteBufferUtil.bytes(onTimeCount / totalCount));
         	
         	List<ByteBuffer> variableValues = new ArrayList<>();
-        	variableValues.add(ByteBufferUtil.bytes(count));
         	String airportName = airportIdToNameMap.get(keyValues[0]);
         	String airlineName = airlineIdToNameMap.get(keyValues[1]);
         	variableValues.add(airportName != null ? ByteBufferUtil.bytes(airportName) : ByteBufferUtil.bytes(""));
