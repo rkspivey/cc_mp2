@@ -71,7 +71,7 @@ public class TopOnTimeAirlines extends Configured implements Tool {
 
         jobA.setMapperClass(OnTimeArrivalCountMap.class);
         jobA.setReducerClass(OnTimeArrivalCountReduce.class);
-        jobA.setCombinerClass(OnTimeArrivalCountCombiner.class);
+        //jobA.setCombinerClass(OnTimeArrivalCountCombiner.class);
 
         FileInputFormat.setInputPaths(jobA, new Path(args[0]));
         FileOutputFormat.setOutputPath(jobA, tmpPath);
@@ -112,6 +112,8 @@ public class TopOnTimeAirlines extends Configured implements Tool {
         			Double delayMinutes = Double.parseDouble(values[Util.ARR_DELAY_15_INDEX]);
             		if (delayMinutes <= 0) {
                 		context.write(new Text(airlineId), new IntWritable(1));
+            		} else {
+            			context.write(new Text(airlineId), new IntWritable(0));
             		}
         		} catch (NumberFormatException nfe) {
         			// just ignore
@@ -133,21 +135,30 @@ public class TopOnTimeAirlines extends Configured implements Tool {
         }
     }
 
-    public static class OnTimeArrivalCountReduce extends Reducer<Text, IntWritable, Text, IntWritable> {
+    public static class OnTimeArrivalCountReduce extends Reducer<Text, IntWritable, Text, Text> {
         @Override
         public void reduce(Text key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
-        	int count = 0;
+        	int totalCount = 0;
+        	int onTimeCount = 0;
         	
         	for (IntWritable value : values) {
-       			count += value.get();
+       			onTimeCount += value.get();
+       			totalCount++;
         	}
-       		context.write(key, new IntWritable(count));
+        	
+        	StringBuilder builder = new StringBuilder();
+        	builder.append(onTimeCount);
+        	builder.append(' ');
+        	builder.append(totalCount);
+       		context.write(key, new Text(builder.toString()));
         }
     }
 
+    
+    
     public static class TopOnTimeArrivalAirlinesMap extends Mapper<Text, Text, NullWritable, TextArrayWritable> {
         Integer N;
-        TreeSet<Pair<Integer, String>> countToAirlineMap = new TreeSet<Pair<Integer, String>>();
+        TreeSet<Pair<OnTimeStats, String>> countToAirlineMap = new TreeSet<Pair<OnTimeStats, String>>();
 
         @Override
         protected void setup(Context context) throws IOException,InterruptedException {
@@ -157,19 +168,21 @@ public class TopOnTimeAirlines extends Configured implements Tool {
 
         @Override
         public void map(Text key, Text value, Context context) throws IOException, InterruptedException {
-        	Integer count = Integer.parseInt(value.toString());
+        	String[] valueStrings = value.toString().split(" ");
+        	Integer onTimeCount = Integer.parseInt(valueStrings[0]);
+        	Integer totalCount = Integer.parseInt(valueStrings[1]);
         	String airlineId = key.toString();
 
         	countToAirlineMap.add(
-        		new	Pair<Integer, String>(count, airlineId));
+        		new	Pair<OnTimeStats, String>(new OnTimeStats(airlineId, onTimeCount, totalCount), airlineId));
         	if (countToAirlineMap.size() > N) {
-        		countToAirlineMap.remove(countToAirlineMap.first());
+        		countToAirlineMap.remove(countToAirlineMap.last());
         	}
         }
 
         @Override
         protected void cleanup(Context context) throws IOException, InterruptedException {
-        	for (Pair<Integer, String> item : countToAirlineMap) {
+        	for (Pair<OnTimeStats, String> item : countToAirlineMap) {
         		String[] strings = {item.second, item.first.toString()};
         		TextArrayWritable val = new TextArrayWritable(strings);
         		context.write(NullWritable.get(), val);
@@ -177,9 +190,9 @@ public class TopOnTimeAirlines extends Configured implements Tool {
         }
     }
 
-    public static class TopOnTimeArrivalAirlinesReduce extends Reducer<NullWritable, TextArrayWritable, Text, IntWritable> {
+    public static class TopOnTimeArrivalAirlinesReduce extends Reducer<NullWritable, TextArrayWritable, Text, Text> {
         Integer N;
-        TreeSet<Pair<Integer, String>> countToAirlineMap = new TreeSet<Pair<Integer, String>>();
+        TreeSet<Pair<OnTimeStats, String>> countToAirlineMap = new TreeSet<Pair<OnTimeStats, String>>();
         Map<String, String> airlineIdToNameMap = new HashMap<>();
 
         @Override
@@ -198,16 +211,15 @@ public class TopOnTimeAirlines extends Configured implements Tool {
             	if (airlineName == null) {
             		airlineName = airlineId;
             	}
-        		Integer count = Integer.parseInt(pair[1].toString());
-        		countToAirlineMap.add(new Pair<Integer, String>(count, airlineName));
+        		OnTimeStats stats = new OnTimeStats(airlineId, pair[1].toString());
+        		countToAirlineMap.add(new Pair<OnTimeStats, String>(stats, airlineName));
         		if (countToAirlineMap.size() > N) {
         			countToAirlineMap.remove(countToAirlineMap.first());
         		}
         	}
-        	for (Pair<Integer, String> item: countToAirlineMap) {
+        	for (Pair<OnTimeStats, String> item: countToAirlineMap) {
         		String airlineName = item.second;
-        		IntWritable value = new IntWritable(item.first);
-        		context.write(new Text(airlineName), value);
+        		context.write(new Text(airlineName), new Text(item.first.toString()));
         	}
         }
     }
