@@ -23,9 +23,13 @@ public class Util {
 	public static final int ORIGIN_INDEX = 'L' - 'A';
 	public static final int DEST_INDEX = 'R' - 'A';
 	public static final int CRC_DEPART_TIME_INDEX = 'X' - 'A';
+	public static final int DEPART_TIME_INDEX = 'Y' - 'A';
 	public static final int DEP_DELAY_15_INDEX = 'Z' - 'A' + 1 + 'B' - 'A';
 	public static final int CRC_ARRIVE_TIME_INDEX = 'Z' - 'A' + 1 + 'I' - 'A';
+	public static final int ARRIVE_TIME_INDEX = 'Z' - 'A' + 1 + 'J' - 'A';
+	public static final int ARR_DELAY_INDEX = 'Z' - 'A' + 1 + 'K' - 'A';
 	public static final int ARR_DELAY_15_INDEX = 'Z' - 'A' + 1 + 'M' - 'A';
+	public static final int CANCELLED_INDEX = 'Z' - 'A' + 1 + 'P' - 'A';
 
 	public static Map<String, String> loadAirportNames(Configuration conf) throws IOException {
 		Map<String, String> airportIdToNameMap = new HashMap<>();
