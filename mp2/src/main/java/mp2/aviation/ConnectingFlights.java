@@ -21,6 +21,7 @@ import au.com.bytecode.opencsv.CSVReader;
 
 import java.io.IOException;
 import java.io.StringReader;
+import java.util.Calendar;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -28,7 +29,7 @@ import java.util.Set;
 
 public class ConnectingFlights extends Configured implements Tool {
     public static final Log LOG = LogFactory.getLog(ConnectingFlights.class);
-    
+
     public static void main(String[] args) throws Exception {
         int res = ToolRunner.run(new Configuration(), new ConnectingFlights(), args);
         System.exit(res);
@@ -97,6 +98,30 @@ public class ConnectingFlights extends Configured implements Tool {
     }
 
     public static class ConnectingFlightReduce extends Reducer<Text, Text, Text, Text> {
+        private int computeDate(int date, int offset) {
+        	int year = date / 10000;
+        	int month = (date % 10000) / 100;
+        	int day = (date % 10000) % 100;
+
+        	int date2 = 0;
+        	
+        	if (day >= 27) {
+        		Calendar c = Calendar.getInstance();
+        		c.set(Calendar.YEAR, year);
+        		c.set(Calendar.MONTH, month - 1);
+        		c.set(Calendar.DAY_OF_MONTH, day);
+        		c.add(Calendar.DAY_OF_MONTH, 2);
+        		int year2 = c.get(Calendar.YEAR);
+        		int month2 = c.get(Calendar.MONTH) + 1;
+        		int day2 = c.get(Calendar.DAY_OF_MONTH);
+        		date2 = year2 * 10000 + month2 * 100 + day2;
+        	} else {
+        		date2 = date + 2;
+        	}
+        	
+    		return date2;
+    	}
+    	
         @Override
         public void reduce(Text key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
         	Set<FlightInfo> originFlights = new HashSet<>();
@@ -113,9 +138,11 @@ public class ConnectingFlights extends Configured implements Tool {
         	
         	for (FlightInfo destFlight : destFlights) {
        			for (FlightInfo originFlight : originFlights) {
-       				if (originFlight.getDate() + 2 == destFlight.getDate() && !originFlight.getOrigin().equals(destFlight.getDest())) {
+       				if (computeDate(originFlight.getDate(), 2) == destFlight.getDate() && !originFlight.getOrigin().equals(destFlight.getDest())) {
 	   					StringBuilder valueBuilder = new StringBuilder();
 	   					valueBuilder.append(originFlight.getDate());
+	   					valueBuilder.append(' ');
+	   					valueBuilder.append(destFlight.getDate());
 	   					valueBuilder.append(' ');
        	   	   			valueBuilder.append(originFlight.getFlightNumber());
        					valueBuilder.append(' ');

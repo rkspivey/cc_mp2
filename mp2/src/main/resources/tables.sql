@@ -38,12 +38,12 @@ create table "connecting_flights" (
 	"origin_flight_date" int,
 	"origin_depart_time" int,
 	"origin_arrival_time" int,
-	"destination_arrival_delay" int,
+	"origin_arrival_delay" int,
 	"destination_flight_date" int,
 	"destination_depart_time" int,
 	"destination_arrival_time" int,
 	"destination_arrival_delay" int,
-	PRIMARY KEY ("origin", "destination", "layover", "flight_num1", "flight_num2")
+	PRIMARY KEY (("origin", "destination"), "layover", "origin_flight_date", "destination_flight_date", "flight_num1", "flight_num2")
 );
 
 
