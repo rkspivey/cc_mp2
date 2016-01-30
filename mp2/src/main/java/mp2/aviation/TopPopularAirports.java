@@ -61,7 +61,7 @@ public class TopPopularAirports extends Configured implements Tool {
 
         Job jobB = Job.getInstance(conf, "Top Airports");
         jobB.setOutputKeyClass(Text.class);
-        jobB.setOutputValueClass(IntWritable.class);
+        jobB.setOutputValueClass(Text.class);
 
         jobB.setMapOutputKeyClass(NullWritable.class);
         jobB.setMapOutputValueClass(TextArrayWritable.class);
@@ -127,7 +127,7 @@ public class TopPopularAirports extends Configured implements Tool {
 
     public static class TopAirportsMap extends Mapper<Text, Text, NullWritable, TextArrayWritable> {
         Integer N;
-        TreeSet<Pair<Integer, String>> countToAirportMap = new TreeSet<Pair<Integer, String>>();
+        TreeSet<Pair<CountStat, String>> countToAirportMap = new TreeSet<Pair<CountStat, String>>();
 
         @Override
         protected void setup(Context context) throws IOException,InterruptedException {
@@ -140,15 +140,15 @@ public class TopPopularAirports extends Configured implements Tool {
         	Integer count = Integer.parseInt(value.toString());
         	String airportId = key.toString();
         	countToAirportMap.add(
-        		new	Pair<Integer, String>(count, airportId));
+        		new	Pair<CountStat, String>(new CountStat(airportId, count), airportId));
         	if (countToAirportMap.size() > N) {
-        		countToAirportMap.remove(countToAirportMap.first());
+        		countToAirportMap.remove(countToAirportMap.last());
         	}
         }
 
         @Override
         protected void cleanup(Context context) throws IOException, InterruptedException {
-        	for (Pair<Integer, String> item : countToAirportMap) {
+        	for (Pair<CountStat, String> item : countToAirportMap) {
         		String[] strings = {item.second, item.first.toString()};
         		TextArrayWritable val = new TextArrayWritable(strings);
         		context.write(NullWritable.get(), val);
@@ -156,9 +156,9 @@ public class TopPopularAirports extends Configured implements Tool {
         }
     }
 
-    public static class TopAirportsReduce extends Reducer<NullWritable, TextArrayWritable, Text, IntWritable> {
+    public static class TopAirportsReduce extends Reducer<NullWritable, TextArrayWritable, Text, Text> {
         Integer N;
-        TreeSet<Pair<Integer, String>> countToAirportMap = new TreeSet<Pair<Integer, String>>();
+        TreeSet<Pair<CountStat, String>> countToAirportMap = new TreeSet<Pair<CountStat, String>>();
         Map<String, String> airportIdToNameMap = new HashMap<>();
 
         @Override
@@ -178,15 +178,14 @@ public class TopPopularAirports extends Configured implements Tool {
         			airportName = airportId;
         		}
         		Integer count = Integer.parseInt(pair[1].toString());
-        		countToAirportMap.add(new Pair<Integer, String>(count, airportName));
+        		countToAirportMap.add(new Pair<CountStat, String>(new CountStat(airportName, count), airportId));
         		if (countToAirportMap.size() > N) {
         			countToAirportMap.remove(countToAirportMap.first());
         		}
         	}
-        	for (Pair<Integer, String> item: countToAirportMap) {
+        	for (Pair<CountStat, String> item: countToAirportMap) {
         		String airportId = item.second;
-        		IntWritable value = new IntWritable(item.first);
-        		context.write(new Text(airportId), value);
+        		context.write(new Text(airportId), new Text(item.first.toString()));
         	}
         }
     }

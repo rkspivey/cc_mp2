@@ -12,6 +12,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
@@ -48,18 +49,17 @@ public class CassieAirportCarriers extends Configured implements Tool {
         Job jobA = Job.getInstance(conf, "Cassie Airport Carriers");
         jobA.getConfiguration().set("mapreduce.job.user.classpath.first", "true");
         jobA.setOutputKeyClass(Text.class);
-        jobA.setOutputValueClass(IntWritable.class);
+        jobA.setOutputValueClass(Text.class);
         jobA.setMapOutputKeyClass(Text.class);
-        jobA.setMapOutputValueClass(IntWritable.class);
-
+        jobA.setMapOutputValueClass(IntArrayWritable.class);
         jobA.setMapperClass(AirportCountMap.class);
         jobA.setReducerClass(AirportCountReduce.class);
-        //jobA.setCombinerClass(AirportCountCombiner.class);
+        jobA.setCombinerClass(AirportCountCombiner.class);
 
         FileInputFormat.setInputPaths(jobA, new Path(args[0]));
         
         String query = "UPDATE mp2.airport_carrier_ontime SET "
-        		+ "origin_name = ?, airline_name = ?";
+        		+ "origin_name = ?, airline_name = ?, ontime_count = ?, total_count = ?";
         CqlConfigHelper.setOutputCql(jobA.getConfiguration(), query);
         ConfigHelper.setOutputColumnFamily(jobA.getConfiguration(), "mp2", "airport_carrier_ontime");
         ConfigHelper.setOutputInitialAddress(jobA.getConfiguration(), args[1]);
@@ -70,7 +70,7 @@ public class CassieAirportCarriers extends Configured implements Tool {
         return jobA.waitForCompletion(true) ? 0 : 1;
     }
 
-    public static class AirportCountMap extends Mapper<Object, Text, Text, IntWritable> {
+    public static class AirportCountMap extends Mapper<Object, Text, Text, IntArrayWritable> {
         @Override
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
         	StringReader valueReader = new StringReader(value.toString());
@@ -78,34 +78,44 @@ public class CassieAirportCarriers extends Configured implements Tool {
         	String[] values = reader.readNext();
         	if (values != null) {
         		String airportAirlineKey = values[Util.ORIGIN_INDEX] + ' ' + values[Util.AIRLINE_ID_INDEX];
+    			Integer[] outputValues = new Integer[2];
         		try {
         			Double delayMinutes = Double.parseDouble(values[Util.DEP_DELAY_15_INDEX]);
-        			if (delayMinutes <= 0) {
-        				context.write(new Text(airportAirlineKey), new IntWritable(1));
-        			} else {
-        				context.write(new Text(airportAirlineKey), new IntWritable(0));
-        			}
+            		if (delayMinutes <= 0) {
+                		outputValues[0] = 1;
+            		} else {
+            			outputValues[0] = 0;
+            		}
         		} catch (NumberFormatException nfe) {
-        			// just ignore
+        			// this means the field is not set, so the flight was cancelled
+        			outputValues[0] = 0;
         		}
+        		outputValues[1] = 1;
+    			context.write(new Text(airportAirlineKey), new IntArrayWritable(outputValues));
         	}
         	reader.close();
         }
     }
 
-    public static class AirportCountCombiner extends Reducer<Text, IntWritable, Text, IntWritable> {
+    public static class AirportCountCombiner extends Reducer<Text, IntArrayWritable, Text, IntArrayWritable> {
         @Override
-        public void reduce(Text key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
-        	int count = 0;
+        public void reduce(Text key, Iterable<IntArrayWritable> values, Context context) throws IOException, InterruptedException {
+        	Integer[] counts = new Integer[2];
+        	counts[0] = 0;
+        	counts[1] = 0;
         	
-        	for (IntWritable value : values) {
-       			count += value.get();
+        	for (IntArrayWritable value : values) {
+        		Writable[] wvalues = value.get();
+        		if (wvalues != null && wvalues.length == 2) {
+        			counts[0] += ((IntWritable) wvalues[0]).get();
+        			counts[1] += ((IntWritable) wvalues[1]).get();
+        		}
         	}
-       		context.write(key, new IntWritable(count));
+       		context.write(key, new IntArrayWritable(counts));
         }
     }
 
-    public static class AirportCountReduce extends Reducer<Text, IntWritable, Map<String, ByteBuffer>, List<ByteBuffer>> {
+    public static class AirportCountReduce extends Reducer<Text, IntArrayWritable, Map<String, ByteBuffer>, List<ByteBuffer>> {
         Map<String, String> airlineIdToNameMap = new HashMap<>();
         Map<String, String> airportIdToNameMap = new HashMap<>();
 
@@ -117,26 +127,31 @@ public class CassieAirportCarriers extends Configured implements Tool {
     	}
     	
         @Override
-        public void reduce(Text key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
-        	double onTimeCount = 0;
-        	double totalCount = 0;
+        public void reduce(Text key, Iterable<IntArrayWritable> values, Context context) throws IOException, InterruptedException {
+        	int onTimeCount = 0;
+        	int totalCount = 0;
         	
-        	for (IntWritable value : values) {
-       			onTimeCount += value.get();
-       			totalCount++;
+        	for (IntArrayWritable value : values) {
+        		Writable[] wvalues = value.get();
+        		if (wvalues != null && wvalues.length == 2) {
+        			onTimeCount += ((IntWritable) wvalues[0]).get();
+        			totalCount += ((IntWritable) wvalues[1]).get();
+        		}
         	}
         	
         	Map<String, ByteBuffer> keys = new LinkedHashMap<String, ByteBuffer>();
         	String[] keyValues = key.toString().split(" ");
         	keys.put("origin", ByteBufferUtil.bytes(keyValues[0]));
         	keys.put("airline_id", ByteBufferUtil.bytes(keyValues[1]));
-        	keys.put("ontime_percentage", ByteBufferUtil.bytes(onTimeCount / totalCount));
+        	keys.put("ontime_percentage", ByteBufferUtil.bytes((double) onTimeCount / (double) totalCount));
         	
         	List<ByteBuffer> variableValues = new ArrayList<>();
         	String airportName = airportIdToNameMap.get(keyValues[0]);
         	String airlineName = airlineIdToNameMap.get(keyValues[1]);
         	variableValues.add(airportName != null ? ByteBufferUtil.bytes(airportName) : ByteBufferUtil.bytes(""));
         	variableValues.add(airlineName != null ? ByteBufferUtil.bytes(airlineName) : ByteBufferUtil.bytes(""));
+        	variableValues.add(ByteBufferUtil.bytes(onTimeCount));
+        	variableValues.add(ByteBufferUtil.bytes(totalCount));
         	
         	context.write(keys, variableValues);
         }

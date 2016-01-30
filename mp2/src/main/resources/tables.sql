@@ -4,6 +4,8 @@ create table "airport_carrier_ontime" (
 	"origin" text,
 	"airline_id" text,
 	"ontime_percentage" double,
+	"ontime_count" int,
+	"total_count" int,
 	"origin_name" text,
 	"airline_name" text,
 	PRIMARY KEY (("origin"), "ontime_percentage", "airline_id")
@@ -13,6 +15,8 @@ create table "airport_dest_ontime" (
 	"origin" text,
 	"destination" text,
 	"ontime_percentage" double,
+	"ontime_count" int,
+	"total_count" int,
 	"origin_name" text,
 	"destination_name" text,
 	PRIMARY KEY (("origin"), "ontime_percentage", "destination")
@@ -23,6 +27,8 @@ create table "source_dest_carrier_ontime" (
 	"destination" text,
 	"airline_id" text,
 	"ontime_percentage" double,
+	"ontime_count" int,
+	"total_count" int,
 	"origin_name" text,
 	"destination_name" text,
 	"airline_name" text,
@@ -43,8 +49,9 @@ create table "connecting_flights" (
 	"destination_depart_time" int,
 	"destination_arrival_time" int,
 	"destination_arrival_delay" int,
-	PRIMARY KEY (("origin", "destination"), "layover", "origin_flight_date", "destination_flight_date", "flight_num1", "flight_num2")
-);
+	"total_delay" int,
+	PRIMARY KEY (("origin", "layover", "destination"), "origin_flight_date", "destination_flight_date", "total_delay", "flight_num1", "flight_num2")
+) with clustering order by ("total_delay" desc);
 
 
 create table "users_with_status_updates" (

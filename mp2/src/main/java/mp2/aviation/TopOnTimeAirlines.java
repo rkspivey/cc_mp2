@@ -9,6 +9,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
@@ -65,13 +66,12 @@ public class TopOnTimeAirlines extends Configured implements Tool {
 
         Job jobA = Job.getInstance(conf, "Airline On-time Arrival Count");
         jobA.setOutputKeyClass(Text.class);
-        jobA.setOutputValueClass(IntWritable.class);
+        jobA.setOutputValueClass(Text.class);
         jobA.setMapOutputKeyClass(Text.class);
-        jobA.setMapOutputValueClass(IntWritable.class);
-
+        jobA.setMapOutputValueClass(IntArrayWritable.class);
         jobA.setMapperClass(OnTimeArrivalCountMap.class);
         jobA.setReducerClass(OnTimeArrivalCountReduce.class);
-        //jobA.setCombinerClass(OnTimeArrivalCountCombiner.class);
+        jobA.setCombinerClass(OnTimeArrivalCountCombiner.class);
 
         FileInputFormat.setInputPaths(jobA, new Path(args[0]));
         FileOutputFormat.setOutputPath(jobA, tmpPath);
@@ -82,10 +82,8 @@ public class TopOnTimeAirlines extends Configured implements Tool {
         Job jobB = Job.getInstance(conf, "Top On-time Arrival Airlines");
         jobB.setOutputKeyClass(Text.class);
         jobB.setOutputValueClass(IntWritable.class);
-
         jobB.setMapOutputKeyClass(NullWritable.class);
         jobB.setMapOutputValueClass(TextArrayWritable.class);
-
         jobB.setMapperClass(TopOnTimeArrivalAirlinesMap.class);
         jobB.setReducerClass(TopOnTimeArrivalAirlinesReduce.class);
         jobB.setNumReduceTasks(1);
@@ -100,7 +98,7 @@ public class TopOnTimeAirlines extends Configured implements Tool {
         return jobB.waitForCompletion(true) ? 0 : 1;
     }
 
-    public static class OnTimeArrivalCountMap extends Mapper<Object, Text, Text, IntWritable> {
+    public static class OnTimeArrivalCountMap extends Mapper<Object, Text, Text, IntArrayWritable> {
         @Override
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
         	StringReader valueReader = new StringReader(value.toString());
@@ -108,48 +106,62 @@ public class TopOnTimeAirlines extends Configured implements Tool {
         	String[] values = reader.readNext();
         	if (values != null) {
         		String airlineId = values[Util.AIRLINE_ID_INDEX];
+    			Integer[] outputValues = new Integer[2];
         		try {
         			Double delayMinutes = Double.parseDouble(values[Util.ARR_DELAY_15_INDEX]);
             		if (delayMinutes <= 0) {
-                		context.write(new Text(airlineId), new IntWritable(1));
+                		outputValues[0] = 1;
             		} else {
-            			context.write(new Text(airlineId), new IntWritable(0));
+            			outputValues[0] = 0;
             		}
         		} catch (NumberFormatException nfe) {
-        			// just ignore
+        			// this means the field is not set, so the flight was cancelled
+        			outputValues[0] = 0;
         		}
+        		outputValues[1] = 1;
+    			context.write(new Text(airlineId), new IntArrayWritable(outputValues));
         	}
         	reader.close();
         }
     }
 
-    public static class OnTimeArrivalCountCombiner extends Reducer<Text, IntWritable, Text, IntWritable> {
+    public static class OnTimeArrivalCountCombiner extends Reducer<Text, IntArrayWritable, Text, IntArrayWritable> {
         @Override
-        public void reduce(Text key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
-        	int count = 0;
+        public void reduce(Text key, Iterable<IntArrayWritable> values, Context context) throws IOException, InterruptedException {
+        	Integer[] counts = new Integer[2];
+        	counts[0] = 0;
+        	counts[1] = 0;
         	
-        	for (IntWritable value : values) {
-       			count += value.get();
+        	for (IntArrayWritable value : values) {
+        		Writable[] wvalues = value.get();
+        		if (wvalues != null && wvalues.length == 2) {
+        			counts[0] += ((IntWritable) wvalues[0]).get();
+        			counts[1] += ((IntWritable) wvalues[1]).get();
+        		}
         	}
-       		context.write(key, new IntWritable(count));
+       		context.write(key, new IntArrayWritable(counts));
         }
     }
 
-    public static class OnTimeArrivalCountReduce extends Reducer<Text, IntWritable, Text, Text> {
+    public static class OnTimeArrivalCountReduce extends Reducer<Text, IntArrayWritable, Text, Text> {
         @Override
-        public void reduce(Text key, Iterable<IntWritable> values, Context context) throws IOException, InterruptedException {
-        	int totalCount = 0;
-        	int onTimeCount = 0;
+        public void reduce(Text key, Iterable<IntArrayWritable> values, Context context) throws IOException, InterruptedException {
+        	Integer[] counts = new Integer[2];
+        	counts[0] = 0;
+        	counts[1] = 0;
         	
-        	for (IntWritable value : values) {
-       			onTimeCount += value.get();
-       			totalCount++;
+        	for (IntArrayWritable value : values) {
+        		Writable[] wvalues = value.get();
+        		if (wvalues != null && wvalues.length == 2) {
+        			counts[0] += ((IntWritable) wvalues[0]).get();
+        			counts[1] += ((IntWritable) wvalues[1]).get();
+        		}
         	}
         	
         	StringBuilder builder = new StringBuilder();
-        	builder.append(onTimeCount);
+        	builder.append(counts[0]);
         	builder.append(' ');
-        	builder.append(totalCount);
+        	builder.append(counts[1]);
        		context.write(key, new Text(builder.toString()));
         }
     }
