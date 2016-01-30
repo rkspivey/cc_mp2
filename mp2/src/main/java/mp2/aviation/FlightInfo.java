@@ -8,6 +8,7 @@ public class FlightInfo {
 	final Integer departTime;
 	final Integer arrivalTime;
 	final Integer arrivalDelay;
+	final boolean cancelled;
 
 	public FlightInfo(String[] values) {
 		origin = values[Util.ORIGIN_INDEX];
@@ -17,17 +18,25 @@ public class FlightInfo {
 		Integer month = Integer.parseInt(values[Util.MONTH_INDEX]);
 		Integer day = Integer.parseInt(values[Util.DAY_INDEX]);
 		date = year * 10000 + month * 100 + day;
-		departTime = Integer.parseInt(values[Util.CRC_DEPART_TIME_INDEX]);
-		arrivalTime = Integer.parseInt(values[Util.CRC_ARRIVE_TIME_INDEX]);
 		int i = values[Util.ARR_DELAY_INDEX].indexOf(".");
 		String arrivalDelayStr = i >= 0 ? values[Util.ARR_DELAY_INDEX].substring(0, i) : values[Util.ARR_DELAY_INDEX];
-		int temp = 0;
+		int temp = Integer.MAX_VALUE;
 		try {
 			temp = Integer.parseInt(arrivalDelayStr);
 		} catch (NumberFormatException nfe) {
 			// just ignore
 		}
 		arrivalDelay = temp;
+    	double cancelledField = values != null && values[Util.CANCELLED_INDEX] != null ? Double.parseDouble(values[Util.CANCELLED_INDEX]) : 1;
+		
+		cancelled = temp == Integer.MAX_VALUE || cancelledField != 0d;
+		if (!cancelled) {
+			departTime = Integer.parseInt(values[Util.DEPART_TIME_INDEX]);
+			arrivalTime = Integer.parseInt(values[Util.ARRIVE_TIME_INDEX]);
+		} else {
+			departTime = Integer.MAX_VALUE;
+			arrivalTime = Integer.MAX_VALUE;			
+		}
 	}
 
 	public String getOrigin() {
@@ -56,6 +65,10 @@ public class FlightInfo {
 
 	public Integer getArrivalDelay() {
 		return arrivalDelay;
+	}
+	
+	public boolean isCancelled() {
+		return cancelled;
 	}
 	
 	@Override

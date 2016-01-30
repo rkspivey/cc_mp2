@@ -49,9 +49,9 @@ create table "connecting_flights" (
 	"destination_depart_time" int,
 	"destination_arrival_time" int,
 	"destination_arrival_delay" int,
-	"total_delay" int,
-	PRIMARY KEY (("origin", "layover", "destination"), "origin_flight_date", "destination_flight_date", "total_delay", "flight_num1", "flight_num2")
-) with clustering order by ("total_delay" desc);
+	"total_arrival_delay" int,
+	PRIMARY KEY (("origin", "layover", "destination", "origin_flight_date"), "total_arrival_delay", "destination_flight_date", "flight_num1", "flight_num2")
+) with clustering order by ("total_arrival_delay");
 
 
 create table "users_with_status_updates" (
