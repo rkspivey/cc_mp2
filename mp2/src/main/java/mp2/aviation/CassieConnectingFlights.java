@@ -64,6 +64,7 @@ public class CassieConnectingFlights extends Configured implements Tool {
         jobA.waitForCompletion(true);;
 
         Job jobB = Job.getInstance(conf, "Cassie Optimize Arrival Time");
+        jobB.getConfiguration().set("mapreduce.job.user.classpath.first", "true");
         jobB.setOutputKeyClass(Text.class);
         jobB.setOutputValueClass(Text.class);
         jobB.setMapOutputKeyClass(Text.class);
@@ -77,10 +78,10 @@ public class CassieConnectingFlights extends Configured implements Tool {
         		+ "origin_depart_time = ?, origin_arrival_time = ?, "
         		+ "destination_depart_time = ?, destination_arrival_time = ?, "
         		+ "origin_arrival_delay = ?, destination_arrival_delay = ?";
-        CqlConfigHelper.setOutputCql(jobA.getConfiguration(), query);
-        ConfigHelper.setOutputColumnFamily(jobA.getConfiguration(), "mp2", "connecting_flights");
-        ConfigHelper.setOutputInitialAddress(jobA.getConfiguration(), args[1]);
-        ConfigHelper.setOutputPartitioner(jobA.getConfiguration(), "Murmur3Partitioner");
+        CqlConfigHelper.setOutputCql(jobB.getConfiguration(), query);
+        ConfigHelper.setOutputColumnFamily(jobB.getConfiguration(), "mp2", "connecting_flights");
+        ConfigHelper.setOutputInitialAddress(jobB.getConfiguration(), args[1]);
+        ConfigHelper.setOutputPartitioner(jobB.getConfiguration(), "Murmur3Partitioner");
         jobB.setInputFormatClass(KeyValueTextInputFormat.class);
         jobB.setOutputFormatClass(CqlOutputFormat.class);
 
@@ -155,30 +156,30 @@ public class CassieConnectingFlights extends Configured implements Tool {
        				if (computeDate(originFlight.getDate(), 2) == destFlight.getDate() && !originFlight.getOrigin().equals(destFlight.getDest())) {
 	   					StringBuilder valueBuilder = new StringBuilder();
 	   					valueBuilder.append(originFlight.getDate());
-	   					valueBuilder.append(' ');
+	   					valueBuilder.append(',');
 	   					valueBuilder.append(destFlight.getDate());
-	   					valueBuilder.append(' ');
+	   					valueBuilder.append(',');
        	   	   			valueBuilder.append(originFlight.getFlightNumber());
-       					valueBuilder.append(' ');
+       					valueBuilder.append(',');
        	   	   			valueBuilder.append(destFlight.getFlightNumber());
-       					valueBuilder.append(' ');
+       					valueBuilder.append(',');
        	   	   			valueBuilder.append(originFlight.getDepartTime());
-       					valueBuilder.append(' ');
+       					valueBuilder.append(',');
        	   	   			valueBuilder.append(destFlight.getDepartTime());
-       					valueBuilder.append(' ');
+       					valueBuilder.append(',');
        	   	   			valueBuilder.append(originFlight.getArrivalTime());
-       					valueBuilder.append(' ');
+       					valueBuilder.append(',');
        	   	   			valueBuilder.append(destFlight.getArrivalTime());
-       					valueBuilder.append(' ');
+       					valueBuilder.append(',');
        	   	   			valueBuilder.append(originFlight.getArrivalDelay());
-       					valueBuilder.append(' ');
+       					valueBuilder.append(',');
        	   	   			valueBuilder.append(destFlight.getArrivalDelay());
 
 	   					StringBuilder keyBuilder = new StringBuilder();
        					keyBuilder.append(originFlight.getOrigin());
-       					keyBuilder.append(' ');
+       					keyBuilder.append(',');
        					keyBuilder.append(originFlight.getDest());
-       					keyBuilder.append(' ');
+       					keyBuilder.append(',');
        					keyBuilder.append(destFlight.getDest());
 
        					context.write(new Text(keyBuilder.toString()), new Text(valueBuilder.toString())); 
@@ -189,8 +190,8 @@ public class CassieConnectingFlights extends Configured implements Tool {
     }
 
     public static class OptimizeArrivalDelayMap extends Mapper<Text, Text, Text, Text> {
-    	Map<Text, Text> flights = new HashMap<>();
-    	Map<Text, Integer> arrivalDelays = new HashMap<>();
+    	Map<String, String> flights = new HashMap<>();
+    	Map<String, Integer> arrivalDelays = new HashMap<>();
 
         @Override
         protected void setup(Context context) throws IOException,InterruptedException {
@@ -198,20 +199,20 @@ public class CassieConnectingFlights extends Configured implements Tool {
 
         @Override
         public void map(Text key, Text value, Context context) throws IOException, InterruptedException {
-    		String[] stringValues = value.toString().split(" ");
+    		String[] stringValues = value.toString().split(",");
     		int leg1ArrivalDelay = Integer.parseInt(stringValues[stringValues.length - 2]);
     		int leg2ArrivalDelay = Integer.parseInt(stringValues[stringValues.length - 1]);
     		Integer lowestDelay = arrivalDelays.get(key);
     		if (lowestDelay == null || lowestDelay > leg1ArrivalDelay + leg2ArrivalDelay) {
-    			flights.put(key, value);
-    			arrivalDelays.put(key, leg1ArrivalDelay + leg2ArrivalDelay);
+    			flights.put(key.toString(), value.toString());
+    			arrivalDelays.put(key.toString(), leg1ArrivalDelay + leg2ArrivalDelay);
     		}
         }
 
         @Override
         protected void cleanup(Context context) throws IOException, InterruptedException {
-        	for (Map.Entry<Text, Text> entry : flights.entrySet()) {
-        		context.write(entry.getKey(), entry.getValue());
+        	for (Map.Entry<String, String> entry : flights.entrySet()) {
+        		context.write(new Text(entry.getKey()), new Text(entry.getValue()));
         	} 
         }
     }
@@ -223,7 +224,7 @@ public class CassieConnectingFlights extends Configured implements Tool {
         	Text optimalFlights = null;
         	
         	for (Text value : values) {
-        		String[] stringValues = value.toString().split(" ");
+        		String[] stringValues = value.toString().split(",");
         		int leg1ArrivalDelay = Integer.parseInt(stringValues[stringValues.length - 2]);
         		int leg2ArrivalDelay = Integer.parseInt(stringValues[stringValues.length - 1]);
         		if (optimalFlights == null || totalDelay > leg1ArrivalDelay + leg2ArrivalDelay) {
@@ -234,24 +235,24 @@ public class CassieConnectingFlights extends Configured implements Tool {
         	
         	if (optimalFlights != null) {
             	Map<String, ByteBuffer> keys = new LinkedHashMap<String, ByteBuffer>();
-            	String[] keyValues = key.toString().split(" ");
-            	String[] textValues = optimalFlights.toString().split(" ");
+            	String[] keyValues = key.toString().split(",");
+            	String[] textValues = optimalFlights.toString().split(",");
             	
             	keys.put("origin", ByteBufferUtil.bytes(keyValues[0]));
             	keys.put("layover", ByteBufferUtil.bytes(keyValues[1]));
             	keys.put("destination", ByteBufferUtil.bytes(keyValues[2]));
-            	keys.put("origin_flight_date", ByteBufferUtil.bytes(textValues[0]));
-            	keys.put("destination_flight_date", ByteBufferUtil.bytes(textValues[1]));
-            	keys.put("flight_num1", ByteBufferUtil.bytes(textValues[2]));
-            	keys.put("flight_num2", ByteBufferUtil.bytes(textValues[3]));
+            	keys.put("origin_flight_date", ByteBufferUtil.bytes(Integer.parseInt(textValues[0])));
+            	keys.put("destination_flight_date", ByteBufferUtil.bytes(Integer.parseInt(textValues[1])));
+            	keys.put("flight_num1", ByteBufferUtil.bytes(Integer.parseInt(textValues[2])));
+            	keys.put("flight_num2", ByteBufferUtil.bytes(Integer.parseInt(textValues[3])));
             	
             	List<ByteBuffer> variableValues = new ArrayList<>();
-            	variableValues.add(ByteBufferUtil.bytes(textValues[4])); // origin_depart_time
-            	variableValues.add(ByteBufferUtil.bytes(textValues[5])); // origin_arrival_time
-            	variableValues.add(ByteBufferUtil.bytes(textValues[6])); // destination_depart_time
-            	variableValues.add(ByteBufferUtil.bytes(textValues[7])); // destination_arrival_time
-            	variableValues.add(ByteBufferUtil.bytes(textValues[8])); // origin_arrival_delay
-            	variableValues.add(ByteBufferUtil.bytes(textValues[9])); // destination_arrival_delay
+            	variableValues.add(ByteBufferUtil.bytes(Integer.parseInt(textValues[4]))); // origin_depart_time
+            	variableValues.add(ByteBufferUtil.bytes(Integer.parseInt(textValues[5]))); // origin_arrival_time
+            	variableValues.add(ByteBufferUtil.bytes(Integer.parseInt(textValues[6]))); // destination_depart_time
+            	variableValues.add(ByteBufferUtil.bytes(Integer.parseInt(textValues[7]))); // destination_arrival_time
+            	variableValues.add(ByteBufferUtil.bytes(Integer.parseInt(textValues[8]))); // origin_arrival_delay
+            	variableValues.add(ByteBufferUtil.bytes(Integer.parseInt(textValues[9]))); // destination_arrival_delay
             	
             	context.write(keys, variableValues);
         	}
