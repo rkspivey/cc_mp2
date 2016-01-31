@@ -31,6 +31,10 @@ public class Util {
 	public static final int ARR_DELAY_15_INDEX = 'Z' - 'A' + 1 + 'M' - 'A';
 	public static final int CANCELLED_INDEX = 'Z' - 'A' + 1 + 'P' - 'A';
 
+	public static boolean isValidData(String[] data) {
+		return data != null && data.length > CANCELLED_INDEX;
+	}
+	
 	public static Map<String, String> loadAirportNames(Configuration conf) throws IOException {
 		Map<String, String> airportIdToNameMap = new HashMap<>();
         FileSystem fileSystem = FileSystem.get(conf);

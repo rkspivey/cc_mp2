@@ -76,7 +76,7 @@ public class CassieAirportDestinations extends Configured implements Tool {
         	StringReader valueReader = new StringReader(value.toString());
         	CSVReader reader = new CSVReader(valueReader);
         	String[] values = reader.readNext();
-        	if (values != null) {
+        	if (Util.isValidData(values)) {
         		String airportDestKey = values[Util.ORIGIN_INDEX] + ' ' + values[Util.DEST_INDEX];
     			Integer[] outputValues = new Integer[2];
         		try {

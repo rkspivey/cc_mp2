@@ -76,7 +76,7 @@ public class CassieSourceDestCarriers extends Configured implements Tool {
         	StringReader valueReader = new StringReader(value.toString());
         	CSVReader reader = new CSVReader(valueReader);
         	String[] values = reader.readNext();
-        	if (values != null) {
+        	if (Util.isValidData(values)) {
         		String sourceDestAirlineKey = values[Util.ORIGIN_INDEX] + ' ' + values[Util.DEST_INDEX] + ' ' + values[Util.AIRLINE_ID_INDEX];
     			Integer[] outputValues = new Integer[2];
         		try {

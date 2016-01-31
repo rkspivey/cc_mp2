@@ -75,7 +75,7 @@ public class CassieConnectingFlights extends Configured implements Tool {
         	StringReader valueReader = new StringReader(value.toString());
         	CSVReader reader = new CSVReader(valueReader);
         	String[] values = reader.readNext();
-        	if (values != null && values.length >= 42) {
+        	if (Util.isValidData(values)) {
             	FlightInfo flight = new FlightInfo(values);
             	if (!flight.isCancelled()) {
             		if (flight.getDepartTime() > 1200) {

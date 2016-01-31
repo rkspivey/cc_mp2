@@ -86,7 +86,7 @@ public class TopPopularAirports extends Configured implements Tool {
         	StringReader valueReader = new StringReader(value.toString());
         	CSVReader reader = new CSVReader(valueReader);
         	String[] values = reader.readNext();
-        	if (values != null) {
+        	if (Util.isValidData(values)) {
         		String origin = values[Util.ORIGIN_INDEX];
         		if (origin != null && !origin.isEmpty()) {
             		context.write(new Text(origin), new IntWritable(1));
@@ -185,7 +185,8 @@ public class TopPopularAirports extends Configured implements Tool {
         	}
         	for (Pair<CountStat, String> item: countToAirportMap) {
         		String airportId = item.second;
-        		context.write(new Text(airportId), new Text(item.first.toString()));
+        		String airportName = airportIdToNameMap.get(airportId);
+        		context.write(new Text(airportId + " " + airportName), new Text(item.first.toString()));
         	}
         }
     }
