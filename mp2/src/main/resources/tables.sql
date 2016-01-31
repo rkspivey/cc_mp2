@@ -1,4 +1,4 @@
-create keyspace "mp2" with replication = { 'class': 'SimpleStrategy', 'replication_factor': 1 };
+create keyspace "mp2" with replication = { 'class': 'SimpleStrategy', 'replication_factor': 3 };
 
 create table "airport_carrier_ontime" (
 	"origin" text,
@@ -51,7 +51,7 @@ create table "connecting_flights" (
 	"destination_arrival_delay" int,
 	"total_arrival_delay" int,
 	PRIMARY KEY (("origin", "layover", "destination", "origin_flight_date"), "total_arrival_delay", "destination_flight_date", "flight_num1", "flight_num2")
-) with clustering order by ("total_arrival_delay");
+) with clustering order by ("total_arrival_delay" asc);
 
 
 create table "users_with_status_updates" (
