@@ -19,10 +19,7 @@ import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
-import au.com.bytecode.opencsv.CSVReader;
-
 import java.io.IOException;
-import java.io.StringReader;
 import java.lang.Integer;
 import java.util.HashMap;
 import java.util.Map;
@@ -53,7 +50,7 @@ public class TopPopularAirports extends Configured implements Tool {
         jobA.setReducerClass(AirportCountReduce.class);
         jobA.setCombinerClass(AirportCountCombiner.class);
 
-        FileInputFormat.setInputPaths(jobA, new Path(args[0]));
+        Util.readInputFiles(jobA, args[0], Integer.parseInt(args[1]), Integer.parseInt(args[2]));
         FileOutputFormat.setOutputPath(jobA, tmpPath);
 
         jobA.setJarByClass(TopPopularAirports.class);
@@ -71,7 +68,7 @@ public class TopPopularAirports extends Configured implements Tool {
         jobB.setNumReduceTasks(1);
 
         FileInputFormat.setInputPaths(jobB, tmpPath);
-        FileOutputFormat.setOutputPath(jobB, new Path(args[1]));
+        FileOutputFormat.setOutputPath(jobB, new Path(args[3]));
 
         jobB.setInputFormatClass(KeyValueTextInputFormat.class);
         jobB.setOutputFormatClass(TextOutputFormat.class);
@@ -83,9 +80,7 @@ public class TopPopularAirports extends Configured implements Tool {
     public static class AirportCountMap extends Mapper<Object, Text, Text, IntWritable> {
         @Override
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
-        	StringReader valueReader = new StringReader(value.toString());
-        	CSVReader reader = new CSVReader(valueReader);
-        	String[] values = reader.readNext();
+        	String[] values = value.toString().split(",", -1);
         	if (Util.isValidData(values)) {
         		String origin = values[Util.ORIGIN_INDEX];
         		if (origin != null && !origin.isEmpty()) {
@@ -97,7 +92,6 @@ public class TopPopularAirports extends Configured implements Tool {
             		context.write(new Text(dest), new IntWritable(1));        			
         		}
         	}
-        	reader.close();
         }
     }
 

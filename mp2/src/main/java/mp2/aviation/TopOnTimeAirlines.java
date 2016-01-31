@@ -20,11 +20,8 @@ import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
-import au.com.bytecode.opencsv.CSVReader;
-
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.StringReader;
 import java.lang.Integer;
 import java.util.HashMap;
 import java.util.Map;
@@ -33,25 +30,6 @@ import java.util.TreeSet;
 public class TopOnTimeAirlines extends Configured implements Tool {
     public static final Log LOG = LogFactory.getLog(TopOnTimeAirlines.class);
 
-    public static void testCSVReader() throws IOException {
-    	CSVReader reader = new CSVReader(new FileReader("/export/home/kspivey/Downloads/On_Time_On_Time_Performance_2008_9/On_Time_On_Time_Performance_2008_9.csv"));
-    	String[] values = reader.readNext();
-    	final int AIRLINE_ID_INDEX = 'H' - 'A';
-    	final int ARR_DELAY_MINUTES_INDEX = 'Z' - 'A' + 1 + 'L' - 'A';
-    	while (values != null) {
-    		String airlineId = values[AIRLINE_ID_INDEX];
-    		try {
-    			Double delayMinutes = Double.parseDouble(values[ARR_DELAY_MINUTES_INDEX]);
-        		if (delayMinutes <= 0) {
-        		}
-    		} catch (NumberFormatException nfe) {
-    			// just ignore
-    		}
-    		values = reader.readNext();
-    	}
-    	reader.close();
-    }
-    
     public static void main(String[] args) throws Exception {
         int res = ToolRunner.run(new Configuration(), new TopOnTimeAirlines(), args);
         System.exit(res);
@@ -73,7 +51,7 @@ public class TopOnTimeAirlines extends Configured implements Tool {
         jobA.setReducerClass(OnTimeArrivalCountReduce.class);
         jobA.setCombinerClass(OnTimeArrivalCountCombiner.class);
 
-        FileInputFormat.setInputPaths(jobA, new Path(args[0]));
+        Util.readInputFiles(jobA, args[0], Integer.parseInt(args[1]), Integer.parseInt(args[2]));
         FileOutputFormat.setOutputPath(jobA, tmpPath);
 
         jobA.setJarByClass(TopOnTimeAirlines.class);
@@ -89,7 +67,7 @@ public class TopOnTimeAirlines extends Configured implements Tool {
         jobB.setNumReduceTasks(1);
 
         FileInputFormat.setInputPaths(jobB, tmpPath);
-        FileOutputFormat.setOutputPath(jobB, new Path(args[1]));
+        FileOutputFormat.setOutputPath(jobB, new Path(args[3]));
 
         jobB.setInputFormatClass(KeyValueTextInputFormat.class);
         jobB.setOutputFormatClass(TextOutputFormat.class);
@@ -101,9 +79,7 @@ public class TopOnTimeAirlines extends Configured implements Tool {
     public static class OnTimeArrivalCountMap extends Mapper<Object, Text, Text, IntArrayWritable> {
         @Override
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
-        	StringReader valueReader = new StringReader(value.toString());
-        	CSVReader reader = new CSVReader(valueReader);
-        	String[] values = reader.readNext();
+        	String[] values = value.toString().split(",", -1);
         	if (Util.isValidData(values)) {
         		String airlineId = values[Util.AIRLINE_ID_INDEX];
     			Integer[] outputValues = new Integer[2];
@@ -121,7 +97,6 @@ public class TopOnTimeAirlines extends Configured implements Tool {
         		outputValues[1] = 1;
     			context.write(new Text(airlineId), new IntArrayWritable(outputValues));
         	}
-        	reader.close();
         }
     }
 

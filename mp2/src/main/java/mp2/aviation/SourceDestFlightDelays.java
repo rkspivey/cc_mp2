@@ -15,10 +15,7 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
-import au.com.bytecode.opencsv.CSVReader;
-
 import java.io.IOException;
-import java.io.StringReader;
 import java.lang.Integer;
 import java.util.HashMap;
 import java.util.Map;
@@ -71,14 +68,11 @@ public class SourceDestFlightDelays extends Configured implements Tool {
     	
         @Override
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
-        	StringReader valueReader = new StringReader(value.toString());
-        	CSVReader reader = new CSVReader(valueReader);
-        	String[] values = reader.readNext();
+        	String[] values = value.toString().split(",", -1);
         	if (values != null) {
         		String airportAirlineKey = values[Util.ORIGIN_INDEX] + ' ' + values[Util.DEST_INDEX] + ' ' + values[Util.DATE_INDEX];
            		context.write(new Text(airportAirlineKey), new Text(values[Util.FLIGHT_NUM_INDEX] + ' ' + values[Util.ARR_DELAY_15_INDEX]));
         	}
-        	reader.close();
         }
     }
 

@@ -17,10 +17,7 @@ import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
-import au.com.bytecode.opencsv.CSVReader;
-
 import java.io.IOException;
-import java.io.StringReader;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -78,9 +75,7 @@ public class ConnectingFlights extends Configured implements Tool {
 
         @Override
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
-        	StringReader valueReader = new StringReader(value.toString());
-        	CSVReader reader = new CSVReader(valueReader);
-        	String[] values = reader.readNext();
+        	String[] values = value.toString().split(",", -1);
         	if (values != null && values.length >= 42) {
             	FlightInfo flight = new FlightInfo(values);
             	double cancelled = values != null && values[Util.CANCELLED_INDEX] != null ? Double.parseDouble(values[Util.CANCELLED_INDEX]) : 1;
@@ -93,7 +88,6 @@ public class ConnectingFlights extends Configured implements Tool {
             		}
             	}        		
         	}
-        	reader.close();
         }
     }
 
@@ -129,11 +123,8 @@ public class ConnectingFlights extends Configured implements Tool {
         	for (Text value : values) {
         		String valueStr = value.toString();
         		Set<FlightInfo> flights = valueStr.charAt(0) == 'D' ? destFlights : originFlights;
-            	StringReader valueReader = new StringReader(valueStr.substring(2));
-            	CSVReader reader = new CSVReader(valueReader);
-            	String[] stringValues = reader.readNext();
+            	String[] stringValues = valueStr.substring(2).split(",", -1);
         		flights.add(new FlightInfo(stringValues));
-            	reader.close();
         	}
         	
         	for (FlightInfo destFlight : destFlights) {

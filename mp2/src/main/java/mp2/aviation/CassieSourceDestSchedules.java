@@ -14,14 +14,10 @@ import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Reducer;
-import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
-import au.com.bytecode.opencsv.CSVReader;
-
 import java.io.IOException;
-import java.io.StringReader;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -48,14 +44,14 @@ public class CassieSourceDestSchedules extends Configured implements Tool {
         jobA.getConfiguration().set("mapreduce.job.user.classpath.first", "true");
         jobA.setReducerClass(AirportCountReduce.class);
 
-        FileInputFormat.setInputPaths(jobA, new Path(args[0]));
+        Util.readInputFiles(jobA, args[0], Integer.parseInt(args[1]), Integer.parseInt(args[2]));
         
-        String query = "UPDATE mp2.source_dest_schedules SET "
+        String query = "UPDATE " + args[4] + ".source_dest_schedules SET "
         		+ "origin = ?, destination = ?, depart_time = ?, arrival_time = ?";
 //        		+ "origin = ?, destination = ?, depart_time = ?, arrival_time = ?, origin_name = ?, destination_name = ?, airline_name = ?";
         CqlConfigHelper.setOutputCql(jobA.getConfiguration(), query);
-        ConfigHelper.setOutputColumnFamily(jobA.getConfiguration(), "mp2", "source_dest_schedules");
-        ConfigHelper.setOutputInitialAddress(jobA.getConfiguration(), args[1]);
+        ConfigHelper.setOutputColumnFamily(jobA.getConfiguration(), args[4], "source_dest_schedules");
+        ConfigHelper.setOutputInitialAddress(jobA.getConfiguration(), args[3]);
         ConfigHelper.setOutputPartitioner(jobA.getConfiguration(), "Murmur3Partitioner");
         jobA.setOutputFormatClass(CqlOutputFormat.class);
 
@@ -77,11 +73,8 @@ public class CassieSourceDestSchedules extends Configured implements Tool {
         @Override
         public void reduce(LongWritable key, Iterable<Text> text, Context context) throws IOException, InterruptedException {
         	Text value = text.iterator().next();
-        	StringReader valueReader = new StringReader(value.toString());
-        	CSVReader reader = new CSVReader(valueReader);
-        	String[] values = reader.readNext();
+        	String[] values = value.toString().split(",", -1);
         	if (values == null || values[Util.DATE_INDEX] == null || values[Util.DATE_INDEX].trim().length() != 10) {
-        		reader.close();
         		return;
         	}
 
@@ -100,7 +93,6 @@ public class CassieSourceDestSchedules extends Configured implements Tool {
         		arriveTime = Integer.parseInt(values[Util.CRC_ARRIVE_TIME_INDEX]);
         	} catch (NumberFormatException nfe) {
         		LOG.error("NumberFormatException: " + value.toString() + " " + nfe);
-        		reader.close();
         		return;
         	}
         	
@@ -123,8 +115,6 @@ public class CassieSourceDestSchedules extends Configured implements Tool {
         	//variableValues.add(airlineName != null ? ByteBufferUtil.bytes(airlineName) : ByteBufferUtil.bytes(""));
         	
         	context.write(keys, variableValues);
-        	
-        	reader.close();
         }
     }
 

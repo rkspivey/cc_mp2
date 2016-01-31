@@ -11,15 +11,11 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
-import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
-import au.com.bytecode.opencsv.CSVReader;
-
 import java.io.IOException;
-import java.io.StringReader;
 import java.lang.Integer;
 import java.util.HashMap;
 import java.util.Map;
@@ -49,8 +45,8 @@ public class TopSourceDestCarriers extends Configured implements Tool {
         jobA.setReducerClass(AirportCountReduce.class);
         jobA.setCombinerClass(AirportCountCombiner.class);
 
-        FileInputFormat.setInputPaths(jobA, new Path(args[0]));
-        FileOutputFormat.setOutputPath(jobA, new Path(args[1]));
+        Util.readInputFiles(jobA, args[0], Integer.parseInt(args[1]), Integer.parseInt(args[2]));
+        FileOutputFormat.setOutputPath(jobA, new Path(args[3]));
 
         jobA.setJarByClass(TopSourceDestCarriers.class);
         return jobA.waitForCompletion(true) ? 0 : 1;
@@ -71,9 +67,7 @@ public class TopSourceDestCarriers extends Configured implements Tool {
     	
         @Override
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
-        	StringReader valueReader = new StringReader(value.toString());
-        	CSVReader reader = new CSVReader(valueReader);
-        	String[] values = reader.readNext();
+        	String[] values = value.toString().split(",", -1);
         	if (values != null) {
         		String airportAirlineKey = values[Util.ORIGIN_INDEX] + ' ' + values[Util.DEST_INDEX] + ' ' + values[Util.AIRLINE_ID_INDEX];
         		try {
@@ -85,7 +79,6 @@ public class TopSourceDestCarriers extends Configured implements Tool {
         			// just ignore
         		}
         	}
-        	reader.close();
         }
     }
 

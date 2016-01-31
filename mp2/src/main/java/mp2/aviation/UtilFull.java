@@ -9,43 +9,30 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 
 import au.com.bytecode.opencsv.CSVReader;
 
-public class Util {
+public class UtilFull {
 
-	public static final int YEAR_INDEX = 0;
-	public static final int MONTH_INDEX = 1;
-	public static final int DAY_INDEX = 2;
-	public static final int DATE_INDEX = 3;
-	public static final int AIRLINE_ID_INDEX = 4;
-	public static final int FLIGHT_NUM_INDEX = 5;
-	public static final int ORIGIN_INDEX = 6;
-	public static final int DEST_INDEX = 7;
-	public static final int CRC_DEPART_TIME_INDEX = 8;
-	public static final int DEPART_TIME_INDEX = 9;
-	public static final int DEP_DELAY_15_INDEX = 10;
-	public static final int CRC_ARRIVE_TIME_INDEX = 11;
-	public static final int ARRIVE_TIME_INDEX = 12;
-	public static final int ARR_DELAY_INDEX = 13;
-	public static final int ARR_DELAY_15_INDEX = 14;
-	public static final int CANCELLED_INDEX = 15;
+	public static final int YEAR_INDEX = 'A' - 'A';
+	public static final int MONTH_INDEX = 'C' - 'A';
+	public static final int DAY_INDEX = 'D' - 'A';
+	public static final int DATE_INDEX = 'F' - 'A';
+	public static final int AIRLINE_ID_INDEX = 'H' - 'A';
+	public static final int FLIGHT_NUM_INDEX = 'K' - 'A';
+	public static final int ORIGIN_INDEX = 'L' - 'A';
+	public static final int DEST_INDEX = 'R' - 'A';
+	public static final int CRC_DEPART_TIME_INDEX = 'X' - 'A';
+	public static final int DEPART_TIME_INDEX = 'Y' - 'A';
+	public static final int DEP_DELAY_15_INDEX = 'Z' - 'A' + 1 + 'B' - 'A';
+	public static final int CRC_ARRIVE_TIME_INDEX = 'Z' - 'A' + 1 + 'I' - 'A';
+	public static final int ARRIVE_TIME_INDEX = 'Z' - 'A' + 1 + 'J' - 'A';
+	public static final int ARR_DELAY_INDEX = 'Z' - 'A' + 1 + 'K' - 'A';
+	public static final int ARR_DELAY_15_INDEX = 'Z' - 'A' + 1 + 'M' - 'A';
+	public static final int CANCELLED_INDEX = 'Z' - 'A' + 1 + 'P' - 'A';
 
 	public static boolean isValidData(String[] data) {
 		return data != null && data.length > CANCELLED_INDEX;
-	}
-	
-	public static void readInputFiles(Job job, String path, int startYear, int endYear) throws IllegalArgumentException, IOException {
-		for (int year = startYear; year <= endYear; year++) {
-			StringBuilder builder = new StringBuilder();
-			builder.append(path);
-			builder.append("/ontimedata");
-			builder.append(year);
-			builder.append(".csv");
-	        FileInputFormat.setInputPaths(job, new Path(builder.toString()));			
-		}
 	}
 	
 	public static Map<String, String> loadAirportNames(Configuration conf) throws IOException {

@@ -8,21 +8,14 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
-import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
-import au.com.bytecode.opencsv.CSVReader;
-
-import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
-import java.io.StringReader;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -53,15 +46,15 @@ public class CassieConnectingFlights extends Configured implements Tool {
         jobA.setMapperClass(ConnectingFlightMap.class);
         jobA.setReducerClass(ConnectingFlightReduce.class);
 
-        FileInputFormat.setInputPaths(jobA, new Path(args[0]));
+        Util.readInputFiles(jobA, args[0], Integer.parseInt(args[1]), Integer.parseInt(args[2]));
 
-        String query = "UPDATE mp2.connecting_flights SET "
+        String query = "UPDATE " + args[4] + ".connecting_flights SET "
         		+ "origin_depart_time = ?, origin_arrival_time = ?, "
         		+ "destination_depart_time = ?, destination_arrival_time = ?, "
         		+ "origin_arrival_delay = ?, destination_arrival_delay = ?";
         CqlConfigHelper.setOutputCql(jobA.getConfiguration(), query);
-        ConfigHelper.setOutputColumnFamily(jobA.getConfiguration(), "mp2", "connecting_flights");
-        ConfigHelper.setOutputInitialAddress(jobA.getConfiguration(), args[1]);
+        ConfigHelper.setOutputColumnFamily(jobA.getConfiguration(), args[4], "connecting_flights");
+        ConfigHelper.setOutputInitialAddress(jobA.getConfiguration(), args[3]);
         ConfigHelper.setOutputPartitioner(jobA.getConfiguration(), "Murmur3Partitioner");
         jobA.setOutputFormatClass(CqlOutputFormat.class);
         jobA.setJarByClass(CassieConnectingFlights.class);
@@ -72,9 +65,7 @@ public class CassieConnectingFlights extends Configured implements Tool {
 
         @Override
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
-        	StringReader valueReader = new StringReader(value.toString());
-        	CSVReader reader = new CSVReader(valueReader);
-        	String[] values = reader.readNext();
+        	String[] values = value.toString().split(",", -1);
         	if (Util.isValidData(values)) {
             	FlightInfo flight = new FlightInfo(values);
             	if (!flight.isCancelled()) {
@@ -86,7 +77,6 @@ public class CassieConnectingFlights extends Configured implements Tool {
             		}
             	}        		
         	}
-        	reader.close();
         }
     }
 
@@ -122,11 +112,8 @@ public class CassieConnectingFlights extends Configured implements Tool {
         	for (Text value : values) {
         		String valueStr = value.toString();
         		Set<FlightInfo> flights = valueStr.charAt(0) == 'D' ? destFlights : originFlights;
-            	StringReader valueReader = new StringReader(valueStr.substring(2));
-            	CSVReader reader = new CSVReader(valueReader);
-            	String[] stringValues = reader.readNext();
+            	String[] stringValues = valueStr.substring(2).split(",", -1);
         		flights.add(new FlightInfo(stringValues));
-            	reader.close();
         	}
         	
         	for (FlightInfo destFlight : destFlights) {
