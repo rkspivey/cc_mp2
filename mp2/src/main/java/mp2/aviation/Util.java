@@ -41,10 +41,9 @@ public class Util {
 		for (int year = startYear; year <= endYear; year++) {
 			StringBuilder builder = new StringBuilder();
 			builder.append(path);
-			builder.append("/ontimedata");
 			builder.append(year);
 			builder.append(".csv");
-	        FileInputFormat.setInputPaths(job, new Path(builder.toString()));			
+	        FileInputFormat.addInputPath(job, new Path(builder.toString()));			
 		}
 	}
 	

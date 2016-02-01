@@ -20,9 +20,9 @@ import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
-import java.io.FileReader;
 import java.io.IOException;
 import java.lang.Integer;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeSet;
@@ -141,11 +141,18 @@ public class TopOnTimeAirlines extends Configured implements Tool {
         }
     }
 
-    
-    
+    public static class PairComparator implements Comparator<Pair<OnTimeStats, String>> {
+
+		@Override
+		public int compare(Pair<OnTimeStats, String> o1, Pair<OnTimeStats, String> o2) {
+			return o2.first.compareTo(o1.first);
+		}
+    	
+    }
+
     public static class TopOnTimeArrivalAirlinesMap extends Mapper<Text, Text, NullWritable, TextArrayWritable> {
         Integer N;
-        TreeSet<Pair<OnTimeStats, String>> countToAirlineMap = new TreeSet<Pair<OnTimeStats, String>>();
+        TreeSet<Pair<OnTimeStats, String>> countToAirlineMap = new TreeSet<Pair<OnTimeStats, String>>(new PairComparator());
 
         @Override
         protected void setup(Context context) throws IOException,InterruptedException {
@@ -179,7 +186,7 @@ public class TopOnTimeAirlines extends Configured implements Tool {
 
     public static class TopOnTimeArrivalAirlinesReduce extends Reducer<NullWritable, TextArrayWritable, Text, Text> {
         Integer N;
-        TreeSet<Pair<OnTimeStats, String>> countToAirlineMap = new TreeSet<Pair<OnTimeStats, String>>();
+        TreeSet<Pair<OnTimeStats, String>> countToAirlineMap = new TreeSet<Pair<OnTimeStats, String>>(new PairComparator());
         Map<String, String> airlineIdToNameMap = new HashMap<>();
 
         @Override
@@ -201,7 +208,7 @@ public class TopOnTimeAirlines extends Configured implements Tool {
         		OnTimeStats stats = new OnTimeStats(airlineId, pair[1].toString());
         		countToAirlineMap.add(new Pair<OnTimeStats, String>(stats, airlineName));
         		if (countToAirlineMap.size() > N) {
-        			countToAirlineMap.remove(countToAirlineMap.first());
+        			countToAirlineMap.remove(countToAirlineMap.last());
         		}
         	}
         	for (Pair<OnTimeStats, String> item: countToAirlineMap) {

@@ -21,6 +21,7 @@ import org.apache.hadoop.util.ToolRunner;
 
 import java.io.IOException;
 import java.lang.Integer;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeSet;
@@ -119,9 +120,18 @@ public class TopPopularAirports extends Configured implements Tool {
         }
     }
 
+    public static class PairComparator implements Comparator<Pair<CountStat, String>> {
+
+		@Override
+		public int compare(Pair<CountStat, String> o1, Pair<CountStat, String> o2) {
+			return o2.first.compareTo(o1.first);
+		}
+    	
+    }
+
     public static class TopAirportsMap extends Mapper<Text, Text, NullWritable, TextArrayWritable> {
         Integer N;
-        TreeSet<Pair<CountStat, String>> countToAirportMap = new TreeSet<Pair<CountStat, String>>();
+        TreeSet<Pair<CountStat, String>> countToAirportMap = new TreeSet<Pair<CountStat, String>>(new PairComparator());
 
         @Override
         protected void setup(Context context) throws IOException,InterruptedException {
@@ -152,7 +162,7 @@ public class TopPopularAirports extends Configured implements Tool {
 
     public static class TopAirportsReduce extends Reducer<NullWritable, TextArrayWritable, Text, Text> {
         Integer N;
-        TreeSet<Pair<CountStat, String>> countToAirportMap = new TreeSet<Pair<CountStat, String>>();
+        TreeSet<Pair<CountStat, String>> countToAirportMap = new TreeSet<Pair<CountStat, String>>(new PairComparator());
         Map<String, String> airportIdToNameMap = new HashMap<>();
 
         @Override
@@ -174,7 +184,7 @@ public class TopPopularAirports extends Configured implements Tool {
         		Integer count = Integer.parseInt(pair[1].toString());
         		countToAirportMap.add(new Pair<CountStat, String>(new CountStat(airportName, count), airportId));
         		if (countToAirportMap.size() > N) {
-        			countToAirportMap.remove(countToAirportMap.first());
+        			countToAirportMap.remove(countToAirportMap.last());
         		}
         	}
         	for (Pair<CountStat, String> item: countToAirportMap) {
