@@ -1,6 +1,6 @@
 package mp2.aviation;
 
-public class FlightInfo {
+public class FlightInfo implements Comparable<FlightInfo> {
 	final String origin;
 	final String dest;
 	final Integer flightNumber;
@@ -144,6 +144,27 @@ public class FlightInfo {
 		} else if (!origin.equals(other.origin))
 			return false;
 		return true;
+	}
+
+	@Override
+	public int compareTo(FlightInfo o) {
+		int result = origin.compareTo(o.origin);
+		if (result == 0) {
+			result = dest.compareTo(o.dest);
+		}
+		if (result == 0) {
+			result = date.compareTo(o.date);
+		}
+		if (result == 0) {
+			result = flightNumber.compareTo(o.flightNumber);
+		}
+		if (result == 0) {
+			result = departTime.compareTo(o.departTime);
+		}
+		if (result == 0) {
+			result = arrivalTime.compareTo(o.arrivalTime);
+		}
+		return result;
 	}
 
 }

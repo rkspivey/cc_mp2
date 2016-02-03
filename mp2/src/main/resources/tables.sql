@@ -36,22 +36,15 @@ create table "source_dest_carrier_ontime" (
 ) with clustering order by ("ontime_percentage" desc);
 
 create table "connecting_flights" (
-	"flight_num1" int,
-	"flight_num2" int,
 	"origin" text,
 	"layover" text,
 	"destination" text,
 	"origin_flight_date" int,
-	"origin_depart_time" int,
-	"origin_arrival_time" int,
-	"origin_arrival_delay" int,
-	"destination_flight_date" int,
-	"destination_depart_time" int,
-	"destination_arrival_time" int,
-	"destination_arrival_delay" int,
+	"flight_num1" int,
+	"flight_num2" int,
 	"total_arrival_delay" int,
-	PRIMARY KEY (("origin", "layover", "destination", "origin_flight_date"), "total_arrival_delay", "destination_flight_date", "flight_num1", "flight_num2")
-) with clustering order by ("total_arrival_delay" asc);
+	PRIMARY KEY ("origin_flight_date", "origin", "layover", "destination")
+);
 
 
 create table "users_with_status_updates" (
