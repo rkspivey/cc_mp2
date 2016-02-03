@@ -118,7 +118,7 @@ public class CassieConnectingFlights extends Configured implements Tool {
         	
         	for (FlightInfo destFlight : destFlights) {
        			for (FlightInfo originFlight : originFlights) {
-       				if (computeDate(originFlight.getDate(), 2) == destFlight.getDate() && !originFlight.getOrigin().equals(destFlight.getDest())) {
+       				if (computeDate(originFlight.getDate(), 2) == destFlight.getDate()) {
        	            	Map<String, ByteBuffer> keys = new LinkedHashMap<String, ByteBuffer>();
        	            	
        	            	keys.put("origin", ByteBufferUtil.bytes(originFlight.getOrigin()));
